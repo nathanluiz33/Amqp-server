@@ -1,0 +1,23 @@
+// amqp_queues.h
+
+#include <string.h>
+#include <stdio.h>
+#include "round_robin.h"
+
+#ifndef AMQP_QUEUES_H
+#define AMQP_QUEUES_H
+
+typedef struct AmqpQueue {
+    char name[256];
+    RoundRobin* RR;
+} AmqpQueue;
+
+void declare_AmqpQueue(const char* name);
+int add_client_to_AmqpQueue (const char* name, int connfd, ClientOutputQueue* client_output_queue);
+void publish_AmqpQueue (const char* name, const char* data);
+int rm_client_from_AmqpQueue (const char* name, int connfd);
+
+extern int queueCount;
+extern AmqpQueue* queues[1024];
+
+#endif
