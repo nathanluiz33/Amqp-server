@@ -8,6 +8,8 @@
 #include "round_robin.h"
 
 void add_client (RoundRobin* RR, int connfd, ClientOutputQueue* client_output_queue) {
+    RR->client_count++;
+
     AmqpClient* new_client = (AmqpClient*)malloc(sizeof(AmqpClient));
     assert (new_client != NULL);
 
@@ -26,6 +28,7 @@ void add_client (RoundRobin* RR, int connfd, ClientOutputQueue* client_output_qu
 }
 
 void rm_client (RoundRobin* RR, int connfd) {
+    RR->client_count--;
     // temos que achar o client com o mesmo connfd
     // se so tem um client, temos que remover ele
     if (RR->front_client->next == RR->front_client) {
@@ -59,6 +62,8 @@ void rm_client (RoundRobin* RR, int connfd) {
 }
 
 void add_message (RoundRobin* RR, const char* data) {
+    RR->message_count++;
+
     AmqpMessage* new_node = (AmqpMessage*)malloc(sizeof(AmqpMessage));
     assert (new_node != NULL);
 
@@ -76,6 +81,8 @@ void add_message (RoundRobin* RR, const char* data) {
 void consume(RoundRobin* RR) {
     while (RR->front_message != NULL && RR->front_client != NULL) {
         // se temos pelo menos um cliente e uma mensagem
+        RR->message_count--;
+        
         char* data = strdup(RR->front_message->data);
         assert (data != NULL);
 

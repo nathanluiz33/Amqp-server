@@ -11,12 +11,23 @@
 int queueCount = 0;
 AmqpQueue* queues[1024];
 
+void get_message_and_clients_count (const char* name, u_int32_t* message_count, u_int32_t* client_count) {
+    for (int i = 0; i < queueCount; i++) if (strcmp(queues[i]->name, name) == 0) {
+        *message_count = queues[i]->RR->message_count;
+        *client_count = queues[i]->RR->client_count;
+        return;
+    }
+    assert (0 && "Queue not found when trying to get message and client count");
+}
+
 void declare_AmqpQueue(const char* name) {
     for (int i = 0; i < queueCount; i++) if (strcmp(queues[i]->name, name) == 0) return;
     queues[queueCount] = (AmqpQueue*)malloc(sizeof(AmqpQueue));
 
     strcpy (queues[queueCount]->name, name);
     queues[queueCount]->RR = (RoundRobin*)malloc(sizeof(RoundRobin));
+    queues[queueCount]->RR->message_count = 0;
+    queues[queueCount]->RR->client_count = 0;
     queueCount++;
 }
 

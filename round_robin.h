@@ -8,9 +8,11 @@
 
 typedef struct RoundRobin {
     // temos uma fila de mensagens a serem enviadas
+    u_int32_t message_count;
     AmqpMessage* front_message;
     AmqpMessage* rear_message;
     // temos uma fila de clientes a receber as mensagens
+    u_int32_t client_count;
     AmqpClient* front_client;
     AmqpClient* rear_client;
 } RoundRobin;

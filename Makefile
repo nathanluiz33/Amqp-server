@@ -15,6 +15,8 @@ run:
 	gcc -c amqp_client.c
 	gcc -c round_robin.c
 	gcc -c amqp_queues.c
+	gcc -c hardcoded_values.c
+	gcc -c packages.c
 	gcc -o redes-servidor-exemplo-ep1 redes-servidor-exemplo-ep1.c *.o
 
 clean:
