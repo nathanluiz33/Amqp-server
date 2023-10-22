@@ -26,13 +26,14 @@ int find_payload_size (ClientThread *client) {
 int read_next_method (ClientThread *client) {
     {
         size_t size = read(client->connfd, client->recvline, FRAME_HEADER_SIZE);
+        printf ("size: %zu\n", size);
         if (size < FRAME_HEADER_SIZE) return 1;
     }
 
-    printf ("frame header: %02x %02x %02x %02x %02x %02x %02x\n", client->recvline[0], client->recvline[1], client->recvline[2], client->recvline[3], client->recvline[4], client->recvline[5], client->recvline[6]);
+    // printf ("frame header: %02x %02x %02x %02x %02x %02x %02x\n", client->recvline[0], client->recvline[1], client->recvline[2], client->recvline[3], client->recvline[4], client->recvline[5], client->recvline[6]);
 
     int payload_size = find_payload_size (client);
-    printf ("payload_size: %d\n", payload_size);
+    // printf ("payload_size: %d\n", payload_size);
 
     {
         size_t size = read(client->connfd, client->recvline + FRAME_HEADER_SIZE, payload_size + 1);

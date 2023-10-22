@@ -25,6 +25,31 @@ clean:
 	rm test_round_robin
 	rm redes-servidor-exemplo-ep1
 
+teste_EP:
+	amqp-declare-queue -q Hello
+	amqp-declare-queue -q Hello1
+	amqp-declare-queue -q Hello2
+
+	amqp-publish -r Hello -b "Hello World"
+	amqp-publish -r Hello1 -b "Hello World1"
+	
+	# amqp-consume -q Hello
+	# amqp-consume -q Hello1
+	# amqp-consume -q Hello2
+	# amqp-consume -q Hello2
+
+	# amqp-publish -r Hello -b "Hello World"
+	# amqp-publish -r Hello1 -b "Hello World1"
+	# amqp-publish -r Hello2 -b "Hello World2"
+	# amqp-publish -r Hello2 -b "Hello World2"
+	# amqp-publish -r Hello2 -b "Hello World2"
+
+teste_consume:
+	amqp-declare-queue -q Hello
+	amqp-publish -r Hello -b "Hello World"
+
+	amqp-consume -q Hello cat
+
 %: %.c
 	gcc -o $* $< amqp_queues.c
 
