@@ -52,281 +52,6 @@ const int MAX_THREADS = 1e5;
 
 ClientThread threads[MAX_THREADS];
 
-void handle_publish (ClientThread *client) {
-    char queue_name[256];
-
-    int size = -1;
-    {
-        int cur = 13;
-        cur += client->recvline[cur] + 1;
-
-        size = client->recvline[cur];
-        // printf ("size: %d\n", size);
-        memcpy (queue_name, client->recvline + cur + 1, size);
-        queue_name[size] = '\0';
-    }
-
-    // printf ("PUBLISH queue_name: %s\n", queue_name);
-
-    read_next_method (client);
-
-    content_header* content = (content_header*)malloc(sizeof(content_header));
-    memcpy (content, client->recvline + sizeof (general_frame_header), sizeof (*content));
-
-    unparse_content_header (content);
-
-    // printf ("content: %d %d %llu\n", content->class_id, content->weight, content->body_size);
-
-    read_next_method (client);
-
-    char *body = (char*)malloc(content->body_size + 1);
-    memcpy (body, client->recvline + sizeof (general_frame_header), content->body_size);
-
-    // printf ("body: %s\n", body);
-
-    publish_AmqpQueue (queue_name, body);
-}
-
-void send_declare_queue_ok (ClientThread *client, char *queue_name) {
-    // printf ("aquiqueue_name: %s\n", queue_name);
-
-    general_frame_header* general_frame = (general_frame_header*)malloc(sizeof(general_frame_header));
-    method_payloads_header* method_payloads = (method_payloads_header*)malloc(sizeof(method_payloads_header));
-
-    general_frame->type = TYPE_METHOD;
-    general_frame->channel = 1;
-    method_payloads->class_id = CLASS_QUEUE;
-    method_payloads->method_id = METHOD_DECLARE_OK;
-
-    int cur = 11;
-    u_int8_t queue_size = strlen (queue_name);
-
-    // adicionamos o tamanho do nome da fila
-    memcpy (client->sendline + cur, &queue_size, 1);
-    cur++;
-
-    // colocamos o nome da fila
-    memcpy (client->sendline + cur, queue_name, queue_size);
-    cur += queue_size;
-
-    u_int32_t message_count = 0, consumer_count = 0;
-    get_message_and_clients_count (queue_name, &message_count, &consumer_count);
-
-    message_count = htonl (message_count);
-    consumer_count = htonl (consumer_count);
-
-    memcpy (client->sendline + cur, &message_count, 4);
-    cur += 4;
-
-    memcpy (client->sendline + cur, &consumer_count, 4);
-    cur += 4;
-
-    general_frame->payload_size = cur - 7;
-
-    unparse_general_frame_header (general_frame);
-    unparse_method_payloads_header (method_payloads);
-
-    memcpy (client->sendline, general_frame, sizeof (*general_frame));
-    memcpy (client->sendline + sizeof (*general_frame), method_payloads, sizeof (*method_payloads));
-
-    client->sendline[cur] = '\xce';
-
-    write (client->connfd, client->sendline, cur + 1);
-
-    printf ("declare queue ok sent!\n");
-}
-
-void handle_queue_declare (ClientThread *client) {
-    char queue_name[256];
-
-    int size = client->recvline[14];
-    memcpy (queue_name, client->recvline + 14, size);
-    queue_name[size] = '\0';
-
-    declare_AmqpQueue (queue_name);
-
-    send_declare_queue_ok (client, queue_name);
-}
-
-void handle_deliver (ClientThread *client, const char queue_name[]) {
-    printf ("TOOOAQUIIIIIIIIIIIIIIII\n\n");
-    send_method_brute (client, method_consume_ok_brute, method_consume_ok_brute_size);
-    {
-        general_frame_header* general_frame = (general_frame_header*)malloc(sizeof(general_frame_header));
-        method_payloads_header* method_payloads = (method_payloads_header*)malloc(sizeof(method_payloads_header));
-        
-        general_frame->type = TYPE_METHOD;
-        general_frame->channel = 1;
-        method_payloads->class_id = CLASS_BASIC;
-        method_payloads->method_id = METHOD_DELIVER;
-
-        u_int32_t payload_size = (u_int32_t) sizeof (method_payloads_header) + deliver_method_args_brute_size + 1 + strlen (queue_name);
-        general_frame->payload_size = payload_size;
-
-        int cur = sizeof (general_frame_header) + sizeof (method_payloads_header);
-        memcpy (client->sendline + cur, deliver_method_args_brute, deliver_method_args_brute_size);
-        cur += deliver_method_args_brute_size;
-
-        client->sendline[cur] = strlen (queue_name);
-        memcpy (client->sendline + cur + 1, queue_name, strlen (queue_name));
-        cur += strlen (queue_name) + 1;
-
-
-
-        unparse_general_frame_header (general_frame);
-        unparse_method_payloads_header (method_payloads);
-        printf ("payload_size: %d\n", payload_size);
-
-        memcpy (client->sendline, general_frame, sizeof (general_frame_header));
-        memcpy (client->sendline + sizeof (general_frame_header), method_payloads, sizeof (*method_payloads));
-
-        client->sendline[cur] = '\xce';
-
-        write (client->connfd, client->sendline, cur + 1);
-    }
-    {
-        general_frame_header* general_frame = (general_frame_header*)malloc(sizeof(general_frame_header));
-        content_header* __content_header = (content_header*)malloc(sizeof(content_header));
-        
-        general_frame->type = TYPE_CONTENT_HEADER;
-        general_frame->channel = 1;
-        general_frame->payload_size = 15;
-        __content_header->class_id = CLASS_BASIC;
-        __content_header->weight = 0;
-        __content_header->body_size = strlen (client->client_output_queue->front->data);
-
-        unparse_general_frame_header (general_frame);
-        unparse_content_header (__content_header);
-
-        int cur = 0;
-        memcpy (client->sendline + cur, general_frame, sizeof (general_frame_header));
-        cur += sizeof (general_frame_header);
-
-        memcpy (client->sendline + cur, __content_header, sizeof (*__content_header));
-        cur += sizeof (*__content_header);
-        
-        u_int16_t property_flags = 4096;
-        property_flags = htons (property_flags);
-        memcpy (client->sendline + cur, &property_flags, 2);
-        cur += 2;
-
-        client->sendline[cur] = 1;
-        cur++;
-
-        client->sendline[cur] = '\xce';
-        
-        write (client->connfd, client->sendline, cur + 1);
-    }
-    {
-        general_frame_header* general_frame = (general_frame_header*)malloc(sizeof(general_frame_header));
-
-        general_frame->type = TYPE_CONTENT_BODY;
-        general_frame->channel = 1;
-        general_frame->payload_size = strlen (client->client_output_queue->front->data);
-        unparse_general_frame_header (general_frame);
-
-        int cur = 0;
-        memcpy (client->sendline + cur, general_frame, sizeof (general_frame_header));
-        cur += sizeof (general_frame_header);
-        memcpy (client->sendline + cur, client->client_output_queue->front->data, strlen (client->client_output_queue->front->data));
-        cur += strlen (client->client_output_queue->front->data);
-
-        client->sendline[cur] = '\xce';
-        write (client->connfd, client->sendline, cur + 1);
-    }
-}
-
-void handle_consume (ClientThread *client) {
-    char queue_name[256];
-
-    int size = client->recvline[14];
-    memcpy (queue_name, client->recvline + 14, size);
-    queue_name[size] = '\0';
-
-    printf ("CONSUME queue_name: %s\n", queue_name);
-
-    if (add_client_to_AmqpQueue (queue_name, client->connfd, client->client_output_queue)) {
-        printf ("Fila não existente\n");
-        // devemos mandar mensagem de erro
-        send_method_brute (client, queue_not_found_brute, queue_not_found_brute_size);
-        return;
-    }
-
-    while (1) {
-        if (client->client_output_queue->front != NULL) {
-            ClientOutput* current = client->client_output_queue->front;
-
-            printf("client_output_data: %s\n", current->data);
-            // memcpy (client->sendline, current->data, strlen (current->data));
-            handle_deliver (client, queue_name);
-            // se o negocio morreu, nao podemos fazer nada
-            if (read_next_method (client)) break;
-
-            // printf ("type: %d\n", client->recvline[0]);
-            method_payloads_header* method_payloads = (method_payloads_header*)malloc(sizeof(method_payloads_header));
-            memcpy (method_payloads, client->recvline + sizeof (general_frame_header), sizeof (*method_payloads));
-            unparse_method_payloads_header (method_payloads);
-            if (method_payloads->class_id != CLASS_BASIC || method_payloads->method_id != METHOD_ACK) printf ("ACK invalido\n");
-
-            // write (client->connfd, current->data, strlen (current->data));
-
-            client->client_output_queue->front = client->client_output_queue->front->next;
-            
-            free(current);
-        }
-    }
-
-    rm_client_from_AmqpQueue (queue_name, client->connfd);
-}
-
-int discover_which_method (ClientThread *client) {
-    if (read_next_method (client)) return 1;
-
-    general_frame_header* general_frame = (general_frame_header*)malloc(sizeof(general_frame_header));
-    method_payloads_header* method_payloads = (method_payloads_header*)malloc(sizeof(method_payloads_header));
-
-    size_t shift = sizeof (general_frame_header);
-    memcpy (general_frame, client->recvline, sizeof (*general_frame));
-    memcpy (method_payloads, client->recvline + shift, sizeof (*method_payloads));
-
-    unparse_general_frame_header (general_frame);
-    unparse_method_payloads_header (method_payloads);
-    
-    if (general_frame->type != TYPE_METHOD || general_frame->channel != 1) return 1;
-    
-    if (method_payloads->class_id == CLASS_BASIC && method_payloads->method_id == METHOD_PUBLISH) {
-        // printf ("package: %d %d %d %d %d\n", package->type, package->channel, package->payload_size, package->class_id, package->method_id);
-        handle_publish (client);
-    }
-    else if (method_payloads->class_id == CLASS_BASIC && method_payloads->method_id == METHOD_CONSUME) {
-        handle_consume (client);
-        return 2;
-    }
-    else if (method_payloads->class_id == CLASS_QUEUE && method_payloads->method_id == METHOD_DECLARE) {
-        handle_queue_declare (client);
-    }
-    else {
-        printf ("Metodo nao suportado pelo servidor\n");
-        return 1;
-    }
-
-    return 0;
-}
-
-int finish_connection (ClientThread *client) {
-    if (read_channel_close (client) != 0) {
-        printf("[Uma conexão fechada por channel_close incorreto]\n");
-        return 1;
-    }
-    send_method_brute (client, channel_close_ok_brute, channel_close_ok_brute_size);
-    if (read_connection_close (client) != 0) {
-        printf("[Uma conexão fechada por connection_close incorreto]\n");
-        return 1;
-    }
-    send_method_brute (client, connection_close_ok_brute, connection_close_ok_brute_size);
-    return 0;
-}
-
 void *handle_client(void *arg) {
     ClientThread *client = (ClientThread *)arg;
 
@@ -344,30 +69,32 @@ void *handle_client(void *arg) {
         return NULL;
     }
 
-    for (int i = 0; i < queueCount; i++) {
-        printf ("\nqueue_names: %s\n", queues[i]->name);
-        printf ("queue_clients: %d  queues_messages: %d \n", queues[i]->RR->client_count, queues[i]->RR->message_count);
-        {
-            AmqpClient* current = queues[i]->RR->front_client;
-            if (current != NULL) {
-                do {
-                    printf("connf: %d\n", current->connfd);
-                    current = current->next;
-                } while (current != queues[i]->RR->front_client);
+    {
+        for (int i = 0; i < queueCount; i++) {
+            printf ("\nqueue_names: %s\n", queues[i]->name);
+            printf ("queue_clients: %d  queues_messages: %d \n", queues[i]->RR->client_count, queues[i]->RR->message_count);
+            {
+                AmqpClient* current = queues[i]->RR->front_client;
+                if (current != NULL) {
+                    do {
+                        printf("connf: %d\n", current->connfd);
+                        current = current->next;
+                    } while (current != queues[i]->RR->front_client);
+                }
             }
-        }
-        {
-            AmqpMessage* current = queues[i]->RR->front_message;
-            if (current != NULL) {
-                while (current != NULL) {
-                    printf("message_data: %s\n", current->data);
-                    current = current->next;
+            {
+                AmqpMessage* current = queues[i]->RR->front_message;
+                if (current != NULL) {
+                    while (current != NULL) {
+                        printf("message_data: %s\n", current->data);
+                        current = current->next;
+                    }
                 }
             }
         }
-    }
 
-    printf ("\n\n");
+        printf ("\n\n");
+    }
 
     if (!_consume && finish_connection (client)) {
         printf("[Uma conexão fechada por falha na finalização]\n");
