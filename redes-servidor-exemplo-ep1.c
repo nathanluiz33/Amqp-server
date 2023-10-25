@@ -130,6 +130,11 @@ int main (int argc, char **argv) {
 
     printf("[Servidor no ar. Aguardando conexões na porta %s]\n",argv[1]);
     printf("[Para finalizar, pressione CTRL+c ou rode um kill ou killall]\n");
+    
+    if (pthread_mutex_init(&queuesMutex, NULL) != 0) {
+        perror("Mutex initialization failed");
+        exit(8);
+    }
    
 	for (int cur_thread = 0; ; cur_thread++) {
         if (cur_thread >= MAX_THREADS) {
@@ -142,6 +147,10 @@ int main (int argc, char **argv) {
         }
 
         threads[cur_thread].connfd = connfd;
+        if (pthread_mutex_init(&threads[cur_thread].clientMutex, NULL) != 0) {
+            perror("Mutex initialization failed");
+            exit(8);
+        }
         if (pthread_create(&threads[cur_thread].T, NULL, handle_client, &threads[cur_thread]) != 0) {
             perror("pthread_create :(\n");
             exit(6);

@@ -13,6 +13,7 @@ typedef struct ClientThread {
     ssize_t n;                                  // Armazena o tamanho da string lida do cliente
     char recvline[MAXLINE + 1];                 // Armazena linhas recebidas do cliente
     char sendline[MAXLINE + 1];                 // Armazena linhas a serem enviadas para o cliente
+    pthread_mutex_t clientMutex;
 } ClientThread;
 
 #endif

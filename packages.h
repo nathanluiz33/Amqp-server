@@ -8,6 +8,7 @@
 #include "hardcoded_values.h"
 #include "amqp_queues.h"
 #include "client_thread.h"
+#include <pthread.h>
 
 #define FRAME_HEADER_SIZE 7
 #define MAXLINE 4096

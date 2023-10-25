@@ -44,8 +44,6 @@ void parse_content_header (content_header *package) {
 int read_protocol_header (ClientThread *client) {
     size_t header_size = sizeof (default_protocol_header);
 
-    printf ("header_size: %zu\n", header_size);
-
     if ((client->n=read(client->connfd, client->recvline, MAXLINE)) < header_size) {
         perror("protocol header with different size :(\n");
         return 1;
@@ -67,7 +65,6 @@ int find_payload_size (ClientThread *client) {
 int read_next_method (ClientThread *client) {
     {
         size_t size = read(client->connfd, client->recvline, FRAME_HEADER_SIZE);
-        printf ("size: %zu\n", size);
         if (size < FRAME_HEADER_SIZE) return 1;
     }
     int payload_size = find_payload_size (client);
@@ -136,38 +133,62 @@ void send_channel_open_ok (ClientThread *client) {
 }
 
 int initialize_connection (ClientThread *client) {
+    pthread_mutex_lock(&client->clientMutex);
     if (read_protocol_header (client) != 0) {
+        pthread_mutex_unlock(&client->clientMutex);
         printf("[Uma conexão fechada por header incorreto]\n");
         return 1;
     }
+    pthread_mutex_unlock(&client->clientMutex);
 
+
+    pthread_mutex_lock(&client->clientMutex);
     send_connection_start (client);
+    pthread_mutex_unlock(&client->clientMutex);
 
+    pthread_mutex_lock(&client->clientMutex);
     if (read_connection_start_ok (client) != 0) {
+        pthread_mutex_unlock(&client->clientMutex);
         printf("[Uma conexão fechada por connection_start_ok incorreto]\n");
         return 1;
     }
+    pthread_mutex_unlock(&client->clientMutex);
 
+    pthread_mutex_lock(&client->clientMutex);
     send_connection_tune (client);
+    pthread_mutex_unlock(&client->clientMutex);
 
+    pthread_mutex_lock(&client->clientMutex);
     if (read_connection_tune_ok (client) != 0) {
+        pthread_mutex_unlock(&client->clientMutex);
         printf("[Uma conexão fechada por connection_tune_ok incorreto]\n");
         return 1;
     }
+    pthread_mutex_unlock(&client->clientMutex);
 
+    pthread_mutex_lock(&client->clientMutex);
     if (read_connection_open (client) != 0) {
+        pthread_mutex_unlock(&client->clientMutex);
         printf("[Uma conexão fechada por connection_open incorreto]\n");
         return 1;
     }
+    pthread_mutex_unlock(&client->clientMutex);
 
+    pthread_mutex_lock(&client->clientMutex);
     send_connection_open_ok (client);
+    pthread_mutex_unlock(&client->clientMutex);
 
+    pthread_mutex_lock(&client->clientMutex);
     if (read_channel_open (client) != 0) {
+        pthread_mutex_unlock(&client->clientMutex);
         printf("[Uma conexão fechada por channel_open incorreto]\n");
         return 1;
     }
+    pthread_mutex_unlock(&client->clientMutex);
 
+    pthread_mutex_lock(&client->clientMutex);
     send_channel_open_ok (client);
+    pthread_mutex_unlock(&client->clientMutex);
     return 0;
 }
 
@@ -366,23 +387,27 @@ void handle_consume (ClientThread *client) {
     memcpy (queue_name, client->recvline + 14, size);
     queue_name[size] = '\0';
 
+    pthread_mutex_unlock(&client->clientMutex);
 
+    printf ("AQYUUUUUUIIIIII\n\n\n");
     if (add_client_to_AmqpQueue (queue_name, client)) {
         printf ("Fila não existente\n");
         // devemos mandar mensagem de erro
         send_method_brute (client, queue_not_found_brute, queue_not_found_brute_size);
         return;
     }
+    printf ("DESBLOQUEANDO\n\n\n");
 
-    while (1) {
-
-    }
-
-    rm_client_from_AmqpQueue (queue_name, client->connfd);
+    while (1) {}
 }
 
 int discover_which_method (ClientThread *client) {
-    if (read_next_method (client)) return 1;
+    pthread_mutex_lock(&client->clientMutex);
+    if (read_next_method (client)) {
+        pthread_mutex_unlock(&client->clientMutex);
+        return 1;
+    }
+    pthread_mutex_unlock(&client->clientMutex);
 
     general_frame_header* general_frame = (general_frame_header*)malloc(sizeof(general_frame_header));
     method_payloads_header* method_payloads = (method_payloads_header*)malloc(sizeof(method_payloads_header));
@@ -396,8 +421,11 @@ int discover_which_method (ClientThread *client) {
     
     if (general_frame->type != TYPE_METHOD || general_frame->channel != 1) return 1;
     
+    pthread_mutex_lock(&client->clientMutex);
     if (method_payloads->class_id == CLASS_BASIC && method_payloads->method_id == METHOD_PUBLISH) {
         handle_publish (client);
+        pthread_mutex_unlock(&client->clientMutex);
+        return 0;
     }
     else if (method_payloads->class_id == CLASS_BASIC && method_payloads->method_id == METHOD_CONSUME) {
         handle_consume (client);
@@ -405,25 +433,39 @@ int discover_which_method (ClientThread *client) {
     }
     else if (method_payloads->class_id == CLASS_QUEUE && method_payloads->method_id == METHOD_DECLARE) {
         handle_queue_declare (client);
+        pthread_mutex_unlock(&client->clientMutex);
+        return 0;
     }
     else {
         printf ("Metodo nao suportado pelo servidor\n");
+        pthread_mutex_unlock(&client->clientMutex);
         return 1;
     }
-
-    return 0;
 }
 
 int finish_connection (ClientThread *client) {
+    pthread_mutex_lock(&client->clientMutex);
     if (read_channel_close (client) != 0) {
+        pthread_mutex_unlock(&client->clientMutex);
         printf("[Uma conexão fechada por channel_close incorreto]\n");
         return 1;
     }
+    pthread_mutex_unlock(&client->clientMutex);
+
+    pthread_mutex_lock(&client->clientMutex);
     send_method_brute (client, channel_close_ok_brute, channel_close_ok_brute_size);
+    pthread_mutex_unlock(&client->clientMutex);
+
+    pthread_mutex_lock(&client->clientMutex);
     if (read_connection_close (client) != 0) {
+        pthread_mutex_unlock(&client->clientMutex);
         printf("[Uma conexão fechada por connection_close incorreto]\n");
         return 1;
     }
+    pthread_mutex_unlock(&client->clientMutex);
+
+    pthread_mutex_lock(&client->clientMutex);
     send_method_brute (client, connection_close_ok_brute, connection_close_ok_brute_size);
+    pthread_mutex_unlock(&client->clientMutex);
     return 0;
 }

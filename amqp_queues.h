@@ -1,4 +1,3 @@
-// amqp_queues.h
 #ifndef AMQP_QUEUES_H
 #define AMQP_QUEUES_H
 
@@ -9,6 +8,7 @@
 typedef struct AmqpQueue {
     char name[256];
     RoundRobin* RR;
+    pthread_mutex_t queueMutex;
 } AmqpQueue;
 
 void declare_AmqpQueue(const char* name);
@@ -19,5 +19,6 @@ void get_message_and_clients_count (const char* name, u_int32_t* message_count, 
 
 extern int queueCount;
 extern AmqpQueue* queues[1024];
+extern pthread_mutex_t queuesMutex;
 
 #endif
