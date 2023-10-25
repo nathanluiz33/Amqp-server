@@ -26,16 +26,20 @@ void declare_AmqpQueue(const char* name) {
 
     strcpy (queues[queueCount]->name, name);
     queues[queueCount]->RR = (RoundRobin*)malloc(sizeof(RoundRobin));
+    
+    queues[queueCount]->RR->front_message = queues[queueCount]->RR->rear_message = NULL;
+    queues[queueCount]->RR->front_client = queues[queueCount]->RR->rear_client = NULL;
+
     queues[queueCount]->RR->message_count = 0;
     queues[queueCount]->RR->client_count = 0;
     queueCount++;
 }
 
-int add_client_to_AmqpQueue (const char* name, int connfd, ClientOutputQueue* client_output_queue) {
+int add_client_to_AmqpQueue (const char* name, ClientThread* client_thread) {
     for (int i = 0; i < queueCount; i++) if (strcmp(queues[i]->name, name) == 0) {
-        add_client(queues[i]->RR, connfd, client_output_queue);
+        add_client(queues[i]->RR, client_thread);
 
-        consume (queues[i]->RR);
+        consume (queues[i]->RR, name);
         return 0;
     }
     return 1;
@@ -47,7 +51,7 @@ int rm_client_from_AmqpQueue (const char* name, int connfd) {
     for (int i = 0; i < queueCount; i++) if (strcmp(queues[i]->name, name) == 0) {
         rm_client(queues[i]->RR, connfd);
 
-        consume (queues[i]->RR);
+        consume (queues[i]->RR, name);
         return 0;
     }
     assert (0 && "Queue not found when trying to remove client");
@@ -57,7 +61,7 @@ void publish_AmqpQueue (const char* name, const char* data) {
     for (int i = 0; i < queueCount; i++) if (strcmp(queues[i]->name, name) == 0) {
         add_message(queues[i]->RR, data);
 
-        consume (queues[i]->RR);
+        consume (queues[i]->RR, name);
         return;
     }
     printf ("Queue not found\n");

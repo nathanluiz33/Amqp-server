@@ -1,22 +1,14 @@
+#include "packages.h"
+#include "client_thread.h"
+
 #ifndef AMQP_CLIENT_H
 #define AMQP_CLIENT_H
 
-typedef struct ClientOutput {
-    char data[4096];
-    struct ClientOutput* next;
-} ClientOutput;
-
-typedef struct ClientOutputQueue {
-    ClientOutput* front;
-    ClientOutput* rear;
-} ClientOutputQueue;
-
 typedef struct AmqpClient {
-    int connfd;
-    ClientOutputQueue* client_output_queue;
+    ClientThread* client_thread;
     struct AmqpClient* next;
 } AmqpClient;
 
-void add_message_to_client_output(ClientOutputQueue* queue, const char* data);
+int send_message_to_client(ClientThread* client, const char *queue_name, const char* data);
 
 #endif

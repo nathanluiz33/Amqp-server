@@ -7,15 +7,13 @@
 #include "amqp_client.h"
 #include "round_robin.h"
 
-void add_client (RoundRobin* RR, int connfd, ClientOutputQueue* client_output_queue) {
+void add_client (RoundRobin* RR, ClientThread* client_thread) {
     RR->client_count++;
 
     AmqpClient* new_client = (AmqpClient*)malloc(sizeof(AmqpClient));
     assert (new_client != NULL);
 
-
-    new_client->connfd = connfd;
-    new_client->client_output_queue = client_output_queue;
+    new_client->client_thread = client_thread;
     new_client->next = NULL;
 
     if (RR->front_client == NULL) RR->front_client = RR->rear_client = new_client;
@@ -31,8 +29,8 @@ void rm_client (RoundRobin* RR, int connfd) {
     RR->client_count--;
     // temos que achar o client com o mesmo connfd
     // se so tem um client, temos que remover ele
-    if (RR->front_client->next == RR->front_client) {
-        if (RR->front_client->connfd == connfd) {
+    if (RR->front_client == RR->rear_client) {
+        if (RR->front_client->client_thread->connfd == connfd) {
             free(RR->front_client);
             RR->front_client = NULL;
         }
@@ -41,7 +39,7 @@ void rm_client (RoundRobin* RR, int connfd) {
 
     AmqpClient* current = RR->front_client;
     do {
-        if (current->connfd == connfd) {
+        if (current->client_thread->connfd == connfd) {
             // achamos o client
             // temos que remover ele da lista
             if (current == RR->front_client) {
@@ -78,18 +76,12 @@ void add_message (RoundRobin* RR, const char* data) {
     }
 }
 
-void consume(RoundRobin* RR) {
+void consume(RoundRobin* RR, const char* queue_name) {
     while (RR->front_message != NULL && RR->front_client != NULL) {
         // se temos pelo menos um cliente e uma mensagem
-        RR->message_count--;
-        
+
         char* data = strdup(RR->front_message->data);
         assert (data != NULL);
-
-        AmqpMessage* temp = RR->front_message;
-        RR->front_message = RR->front_message->next;
-
-        if (RR->front_message == NULL) RR->rear_message = NULL;
 
         // temos que fazer isso ir para a droga do cliente
         // giramos o circulo
@@ -97,8 +89,13 @@ void consume(RoundRobin* RR) {
         RR->rear_client = current;
         RR->front_client = RR->front_client->next;
 
-        add_message_to_client_output(current->client_output_queue, data);
+        if (!send_message_to_client(current->client_thread, queue_name, data)) {
+            RR->message_count--;
+            AmqpMessage* temp = RR->front_message;
+            RR->front_message = RR->front_message->next;
 
-        free(temp);
+            if (RR->front_message == NULL) RR->rear_message = NULL;
+            free(temp);
+        }
     }
 }

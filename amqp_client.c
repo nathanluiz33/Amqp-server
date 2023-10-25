@@ -5,18 +5,21 @@
 
 #include "amqp_client.h"
 
-
-void add_message_to_client_output (ClientOutputQueue* queue, const char* data) {
-    ClientOutput* new_node = (ClientOutput*)malloc(sizeof(ClientOutput));
-    assert (new_node != NULL);
-
-    strncpy(new_node->data, data, sizeof(new_node->data) - 1);
-    new_node->data[sizeof(new_node->data) - 1] = '\0'; // Null-terminate the string
-    new_node->next = NULL;
-
-    if (queue->front == NULL) queue->front = queue->rear = new_node;
-    else {
-        queue->rear->next = new_node;
-        queue->rear = new_node;
+int send_message_to_client (ClientThread* client, const char *queue_name, const char* data) {
+    // aqui ja tentamos mandar a mensagem para o cliente
+    // se nao conseguirmos, devemos retornar 1
+    handle_deliver (client, queue_name, data);
+    if (read_next_method (client)) {
+        rm_client_from_AmqpQueue (queue_name, client->connfd);
+        return 1;
     }
+
+    method_payloads_header* method_payloads = (method_payloads_header*)malloc(sizeof(method_payloads_header));
+    memcpy (method_payloads, client->recvline + sizeof (general_frame_header), sizeof (*method_payloads));
+    unparse_method_payloads_header (method_payloads);
+    if (method_payloads->class_id != CLASS_BASIC || method_payloads->method_id != METHOD_ACK) printf ("ACK invalido\n");
+
+    free (method_payloads);
+
+    return 0;
 }

@@ -275,7 +275,7 @@ void handle_queue_declare (ClientThread *client) {
     send_declare_queue_ok (client, queue_name);
 }
 
-void handle_deliver (ClientThread *client, const char queue_name[]) {
+void handle_deliver (ClientThread *client, const char queue_name[], const char data[]) {
     send_method_brute (client, method_consume_ok_brute, method_consume_ok_brute_size);
     {
         general_frame_header* general_frame = (general_frame_header*)malloc(sizeof(general_frame_header));
@@ -316,7 +316,7 @@ void handle_deliver (ClientThread *client, const char queue_name[]) {
         general_frame->payload_size = 15;
         __content_header->class_id = CLASS_BASIC;
         __content_header->weight = 0;
-        __content_header->body_size = strlen (client->client_output_queue->front->data);
+        __content_header->body_size = strlen (data);
 
         unparse_general_frame_header (general_frame);
         unparse_content_header (__content_header);
@@ -345,14 +345,14 @@ void handle_deliver (ClientThread *client, const char queue_name[]) {
 
         general_frame->type = TYPE_CONTENT_BODY;
         general_frame->channel = 1;
-        general_frame->payload_size = strlen (client->client_output_queue->front->data);
+        general_frame->payload_size = strlen (data);
         unparse_general_frame_header (general_frame);
 
         int cur = 0;
         memcpy (client->sendline + cur, general_frame, sizeof (general_frame_header));
         cur += sizeof (general_frame_header);
-        memcpy (client->sendline + cur, client->client_output_queue->front->data, strlen (client->client_output_queue->front->data));
-        cur += strlen (client->client_output_queue->front->data);
+        memcpy (client->sendline + cur, data, strlen (data));
+        cur += strlen (data);
 
         client->sendline[cur] = '\xce';
         write (client->connfd, client->sendline, cur + 1);
@@ -367,7 +367,7 @@ void handle_consume (ClientThread *client) {
     queue_name[size] = '\0';
 
 
-    if (add_client_to_AmqpQueue (queue_name, client->connfd, client->client_output_queue)) {
+    if (add_client_to_AmqpQueue (queue_name, client)) {
         printf ("Fila não existente\n");
         // devemos mandar mensagem de erro
         send_method_brute (client, queue_not_found_brute, queue_not_found_brute_size);
@@ -375,27 +375,7 @@ void handle_consume (ClientThread *client) {
     }
 
     while (1) {
-        if (client->client_output_queue->front != NULL) {
-            ClientOutput* current = client->client_output_queue->front;
 
-            printf("client_output_data: %s\n", current->data);
-            // memcpy (client->sendline, current->data, strlen (current->data));
-            handle_deliver (client, queue_name);
-            // se o negocio morreu, nao podemos fazer nada
-            if (read_next_method (client)) break;
-
-            // printf ("type: %d\n", client->recvline[0]);
-            method_payloads_header* method_payloads = (method_payloads_header*)malloc(sizeof(method_payloads_header));
-            memcpy (method_payloads, client->recvline + sizeof (general_frame_header), sizeof (*method_payloads));
-            unparse_method_payloads_header (method_payloads);
-            if (method_payloads->class_id != CLASS_BASIC || method_payloads->method_id != METHOD_ACK) printf ("ACK invalido\n");
-
-            // write (client->connfd, current->data, strlen (current->data));
-
-            client->client_output_queue->front = client->client_output_queue->front->next;
-            
-            free(current);
-        }
     }
 
     rm_client_from_AmqpQueue (queue_name, client->connfd);

@@ -28,7 +28,6 @@
  */
 
 #include "amqp_queues.h"
-#include "packages.h"
 #include "amqp_message.h"
 #include <pthread.h>
 
@@ -73,15 +72,6 @@ void *handle_client(void *arg) {
         for (int i = 0; i < queueCount; i++) {
             printf ("\nqueue_names: %s\n", queues[i]->name);
             printf ("queue_clients: %d  queues_messages: %d \n", queues[i]->RR->client_count, queues[i]->RR->message_count);
-            {
-                AmqpClient* current = queues[i]->RR->front_client;
-                if (current != NULL) {
-                    do {
-                        printf("connf: %d\n", current->connfd);
-                        current = current->next;
-                    } while (current != queues[i]->RR->front_client);
-                }
-            }
             {
                 AmqpMessage* current = queues[i]->RR->front_message;
                 if (current != NULL) {
@@ -152,7 +142,6 @@ int main (int argc, char **argv) {
         }
 
         threads[cur_thread].connfd = connfd;
-        threads[cur_thread].client_output_queue = (ClientOutputQueue*)malloc(sizeof(ClientOutputQueue));
         if (pthread_create(&threads[cur_thread].T, NULL, handle_client, &threads[cur_thread]) != 0) {
             perror("pthread_create :(\n");
             exit(6);

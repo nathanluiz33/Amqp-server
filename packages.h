@@ -1,21 +1,16 @@
+#ifndef PACKAGES_H
+#define PACKAGES_H
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include "hardcoded_values.h"
 #include "amqp_queues.h"
+#include "client_thread.h"
 
 #define FRAME_HEADER_SIZE 7
 #define MAXLINE 4096
-
-typedef struct ClientThread {
-    int connfd;
-    pthread_t T;
-    ClientOutputQueue* client_output_queue;
-    ssize_t n;                                  // Armazena o tamanho da string lida do cliente
-    char recvline[MAXLINE + 1];                 // Armazena linhas recebidas do cliente
-    char sendline[MAXLINE + 1];                 // Armazena linhas a serem enviadas para o cliente
-} ClientThread;
 
 typedef struct amqp_protocol_header {
     char protocol[4];
@@ -72,8 +67,10 @@ void send_declare_queue_ok (ClientThread *client, char *queue_name);
 
 void handle_queue_declare (ClientThread *client);
 
-void handle_deliver (ClientThread *client, const char queue_name[]);
+void handle_deliver (ClientThread *client, const char queue_name[], const char data[]);
 
 void handle_consume (ClientThread *client);
 
 int discover_which_method (ClientThread *client);
+
+#endif

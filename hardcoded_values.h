@@ -1,3 +1,6 @@
+#ifndef HARDCODED_VALUES_H
+#define HARDCODED_VALUES_H
+
 #include <stdio.h>
 
 #define TYPE_METHOD 1
@@ -44,3 +47,5 @@ extern size_t connection_close_ok_brute_size;
 extern size_t deliver_method_args_brute_size;
 extern size_t method_consume_ok_brute_size;
 extern size_t queue_not_found_brute_size;
+
+#endif
