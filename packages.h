@@ -64,8 +64,6 @@ int finish_connection (ClientThread *client);
 // METHODS
 void handle_publish (ClientThread *client);
 
-void send_declare_queue_ok (ClientThread *client, char *queue_name);
-
 void handle_queue_declare (ClientThread *client);
 
 void handle_deliver (ClientThread *client, const char queue_name[], const char data[]);

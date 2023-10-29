@@ -217,7 +217,6 @@ void handle_publish (ClientThread *client) {
         cur += client->recvline[cur] + 1;
 
         size = client->recvline[cur];
-        // printf ("size: %d\n", size);
         memcpy (queue_name, client->recvline + cur + 1, size);
         queue_name[size] = '\0';
     }
@@ -389,14 +388,12 @@ void handle_consume (ClientThread *client) {
 
     pthread_mutex_unlock(&client->clientMutex);
 
-    printf ("AQYUUUUUUIIIIII\n\n\n");
     if (add_client_to_AmqpQueue (queue_name, client)) {
         printf ("Fila não existente\n");
         // devemos mandar mensagem de erro
         send_method_brute (client, queue_not_found_brute, queue_not_found_brute_size);
         return;
     }
-    printf ("DESBLOQUEANDO\n\n\n");
 
     while (1) {}
 }

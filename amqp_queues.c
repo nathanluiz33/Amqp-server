@@ -56,11 +56,11 @@ int add_client_to_AmqpQueue (const char* name, ClientThread* client_thread) {
     for (int i = 0; i < queueCount; i++) {
         if (strcmp(queues[i]->name, name) == 0) {
             pthread_mutex_lock(&queues[i]->queueMutex);
+            
             add_client(queues[i]->RR, client_thread);
-            pthread_mutex_unlock(&queues[i]->queueMutex);
-
             consume (queues[i]->RR, name);
 
+            pthread_mutex_unlock(&queues[i]->queueMutex);
             return 0;
         }
     }
@@ -72,9 +72,7 @@ int add_client_to_AmqpQueue (const char* name, ClientThread* client_thread) {
 int rm_client_from_AmqpQueue (const char* name, int connfd) {
     for (int i = 0; i < queueCount; i++) {
         if (strcmp(queues[i]->name, name) == 0) {
-            pthread_mutex_lock(&queues[i]->queueMutex);
             rm_client(queues[i]->RR, connfd);
-            pthread_mutex_unlock(&queues[i]->queueMutex);
             return 0;
         }
     }
@@ -85,10 +83,11 @@ void publish_AmqpQueue (const char* name, const char* data) {
     for (int i = 0; i < queueCount; i++) {
         if (strcmp(queues[i]->name, name) == 0) {
             pthread_mutex_lock(&queues[i]->queueMutex);
+            
             add_message(queues[i]->RR, data);
-            pthread_mutex_unlock(&queues[i]->queueMutex);
-
             consume (queues[i]->RR, name);
+
+            pthread_mutex_unlock(&queues[i]->queueMutex);
             return;
         }
     }

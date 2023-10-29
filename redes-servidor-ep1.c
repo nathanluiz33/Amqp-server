@@ -30,6 +30,7 @@
 #include "amqp_queues.h"
 #include "amqp_message.h"
 #include <pthread.h>
+#include <unistd.h>
 
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -49,8 +50,6 @@
 
 const int MAX_THREADS = 1e5;
 
-ClientThread threads[MAX_THREADS];
-
 void *handle_client(void *arg) {
     ClientThread *client = (ClientThread *)arg;
 
@@ -68,32 +67,12 @@ void *handle_client(void *arg) {
         return NULL;
     }
 
-    {
-        for (int i = 0; i < queueCount; i++) {
-            printf ("\nqueue_names: %s\n", queues[i]->name);
-            printf ("queue_clients: %d  queues_messages: %d \n", queues[i]->RR->client_count, queues[i]->RR->message_count);
-            {
-                AmqpMessage* current = queues[i]->RR->front_message;
-                if (current != NULL) {
-                    while (current != NULL) {
-                        printf("message_data: %s\n", current->data);
-                        current = current->next;
-                    }
-                }
-            }
-        }
-
-        printf ("\n\n");
-    }
-
     if (!_consume && finish_connection (client)) {
         printf("[Uma conexão fechada por falha na finalização]\n");
         return NULL;
     }
 
-    // printf ("queue_count: %d\n", queueCount);
-    // for (int i = 0; i < queueCount; i++) printf ("queue_names: %s\n", queues[i]->name);
-    // printf("[Uma conexão fechada]\n");
+    printf("[Uma conexão fechada]\n");
 
     return NULL;
 }
@@ -130,7 +109,7 @@ int main (int argc, char **argv) {
 
     printf("[Servidor no ar. Aguardando conexões na porta %s]\n",argv[1]);
     printf("[Para finalizar, pressione CTRL+c ou rode um kill ou killall]\n");
-    
+
     if (pthread_mutex_init(&queuesMutex, NULL) != 0) {
         perror("Mutex initialization failed");
         exit(8);
@@ -145,13 +124,14 @@ int main (int argc, char **argv) {
             perror("accept :(\n");
             exit(5);
         }
+        ClientThread* client = (ClientThread*)malloc(sizeof(ClientThread));
 
-        threads[cur_thread].connfd = connfd;
-        if (pthread_mutex_init(&threads[cur_thread].clientMutex, NULL) != 0) {
+        client->connfd = connfd;
+        if (pthread_mutex_init(&client->clientMutex, NULL) != 0) {
             perror("Mutex initialization failed");
             exit(8);
         }
-        if (pthread_create(&threads[cur_thread].T, NULL, handle_client, &threads[cur_thread]) != 0) {
+        if (pthread_create(&client->T, NULL, handle_client, client) != 0) {
             perror("pthread_create :(\n");
             exit(6);
         }
