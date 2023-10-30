@@ -1,9 +1,0 @@
-5
-oi
-tudo
-bem?
-sim
-e voce?
-tambem estou
-legal!!!
-end

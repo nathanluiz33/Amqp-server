@@ -13,5 +13,8 @@ clean:
 	rm *.o
 	rm redes-servidor-ep1
 
+run_tests:
+	./testes/alltests.sh
+
 %: %.c
 	gcc -o $* $< amqp_queues.c
